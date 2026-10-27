@@ -14,6 +14,19 @@ from dotenv import load_dotenv
 from supabase import create_client
 
 CONTENT_TYPES = {".mp3": "audio/mpeg", ".m4a": "audio/mp4"}
+# R2 gratis = 10 GB. Se deja 1 GB de margen.
+STORAGE_LIMIT = 9 * 1024**3
+
+
+def bucket_bytes(s3, bucket: str) -> int:
+    total = 0
+    for page in s3.get_paginator("list_objects_v2").paginate(Bucket=bucket):
+        total += sum(o["Size"] for o in page.get("Contents", []))
+    return total
+
+
+def fits(used: int, size: int, limit: int = STORAGE_LIMIT) -> bool:
+    return used + size <= limit
 
 
 def make_key(path: Path) -> str:
@@ -48,6 +61,9 @@ def main(folder: Path) -> None:
     sb = create_client(env["SUPABASE_URL"], env["SUPABASE_SERVICE_ROLE_KEY"])
 
     files = sorted(p for p in folder.rglob("*") if p.suffix.lower() in CONTENT_TYPES)
+    # Se mide el bucket real (incluye archivos sin fila) para no pasar del plan gratis.
+    used = bucket_bytes(s3, env["R2_BUCKET"])
+    print(f"Bucket: {used / 1024**3:.2f} GB usados de {STORAGE_LIMIT / 1024**3:.0f} GB permitidos")
     added = skipped = failed = 0
     for path in files:
         try:
@@ -55,10 +71,15 @@ def main(folder: Path) -> None:
             if sb.table("songs").select("id").eq("r2_key", key).execute().data:
                 skipped += 1
                 continue
-            row = read_tags(path)
+            size = path.stat().st_size
+            if not fits(used, size):
+                print(f"\nAlto: subir {path.name} pasaría el límite gratis de R2. No se sube nada más.", file=sys.stderr)
+                break
+            row = {**read_tags(path), "size_bytes": size}
             s3.upload_file(str(path), env["R2_BUCKET"], key,
                            ExtraArgs={"ContentType": CONTENT_TYPES[path.suffix.lower()]})
             # Si esto falla, el archivo queda en R2 sin fila; al volver a correr se completa.
+            used += size
             sb.table("songs").insert({**row, "r2_key": key}).execute()
             added += 1
             print(f"+ {row['title']} - {row['artist'] or '?'}")

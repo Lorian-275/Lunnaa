@@ -3,7 +3,12 @@ import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import { AwsClient } from "npm:aws4fetch@1.0.20";
 
 const EXPIRES_SECONDS = 6 * 3600;
+// Topes mensuales por debajo del plan gratis (Supabase: 500k invocaciones; R2: 10M lecturas Class B).
+// Cada URL firmada se estima en <= 10 lecturas de R2 (ExoPlayer pide el audio por partes al adelantar).
+const MAX_INVOCATIONS = 400_000;
+const MAX_SIGNED_URLS = 500_000;
 const env = (k: string) => Deno.env.get(k)!;
+const admin = createClient(env("SUPABASE_URL"), env("SUPABASE_SERVICE_ROLE_KEY"));
 
 const r2 = new AwsClient({
   accessKeyId: env("R2_ACCESS_KEY_ID"),
@@ -32,6 +37,13 @@ Deno.serve(async (req) => {
 
   const { data, error } = await sb.from("songs").select("id, r2_key").in("id", ids);
   if (error) return new Response(error.message, { status: 500 });
+
+  const { data: usage, error: usageError } = await admin.rpc("bump_usage", { n: data.length });
+  // Si no se puede contar, no se firma: es preferible cortar la música que pasarse del plan gratis.
+  if (usageError) return new Response(usageError.message, { status: 500 });
+  if (usage.invocations > MAX_INVOCATIONS || usage.signed_urls > MAX_SIGNED_URLS) {
+    return new Response("Se alcanzó el límite mensual gratis. Vuelve el próximo mes.", { status: 429 });
+  }
 
   const urls: Record<string, string> = {};
   for (const s of data) {

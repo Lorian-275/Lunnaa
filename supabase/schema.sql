@@ -38,3 +38,41 @@ alter table playlist_songs enable row level security;
 create policy "canciones de mis playlists" on playlist_songs for all to authenticated
   using (exists (select 1 from playlists p where p.id = playlist_id and p.owner = (select auth.uid())))
   with check (exists (select 1 from playlists p where p.id = playlist_id and p.owner = (select auth.uid())));
+
+-- ---------- Límites del plan gratis ----------
+-- Tamaño de cada audio, para medir el uso de R2 sin listar el bucket.
+alter table songs add column size_bytes bigint;
+
+-- Contador mensual de uso de la función sign-urls.
+create table usage_monthly (
+  month date primary key,
+  invocations int not null default 0,
+  signed_urls int not null default 0
+);
+alter table usage_monthly enable row level security; -- sin políticas: solo service role
+
+create function bump_usage(n int) returns usage_monthly
+language sql security definer set search_path = public as $$
+  insert into usage_monthly as u (month, invocations, signed_urls)
+  values (date_trunc('month', now())::date, 1, n)
+  on conflict (month) do update
+    set invocations = u.invocations + 1, signed_urls = u.signed_urls + n
+  returning *;
+$$;
+revoke execute on function bump_usage(int) from public, anon, authenticated;
+
+-- Lo lee la pestaña de monitoreo del organizador (vía el conector de Supabase).
+create function usage_stats() returns json
+language sql security definer set search_path = public as $$
+  select json_build_object(
+    'month', to_char(now(), 'YYYY-MM'),
+    'songs', (select count(*) from songs),
+    'storage_bytes', (select coalesce(sum(size_bytes), 0) from songs),
+    'db_bytes', pg_database_size(current_database()),
+    'users', (select count(*) from auth.users),
+    'active_users', (select count(*) from auth.users where last_sign_in_at >= date_trunc('month', now())),
+    'invocations', coalesce((select invocations from usage_monthly where month = date_trunc('month', now())::date), 0),
+    'signed_urls', coalesce((select signed_urls from usage_monthly where month = date_trunc('month', now())::date), 0)
+  );
+$$;
+revoke execute on function usage_stats() from public, anon, authenticated;

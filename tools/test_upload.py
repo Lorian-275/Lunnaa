@@ -2,7 +2,11 @@
 import tempfile
 from pathlib import Path
 
-from upload import make_key
+from upload import STORAGE_LIMIT, fits, make_key
+
+assert fits(0, STORAGE_LIMIT), "justo en el límite cabe"
+assert not fits(STORAGE_LIMIT, 1), "un byte más ya no cabe"
+assert not fits(STORAGE_LIMIT - 10, 11)
 
 with tempfile.TemporaryDirectory() as d:
     a, b, c = Path(d, "a.MP3"), Path(d, "b.mp3"), Path(d, "c.mp3")
