@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-
-    <style name="Theme.Lunna" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- Fondo oscuro desde el arranque, para que no parpadee en blanco antes de dibujar Compose. -->
+    <style name="Theme.Lunna" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/night</item>
+    </style>
 </resources>
