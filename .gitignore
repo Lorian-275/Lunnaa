@@ -1,0 +1,20 @@
+# Secretos
+.env
+*.keystore
+*.jks
+local.properties
+
+# Android / Gradle
+.gradle/
+build/
+.idea/
+*.iml
+captures/
+.kotlin/
+
+# Python
+__pycache__/
+.venv/
+
+# Supabase CLI
+supabase/.temp/
