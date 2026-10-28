@@ -447,10 +447,25 @@ fun Library(vm: AppViewModel, player: Player?, currentId: String?, onAdd: (Song)
         LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
             itemsIndexed(vm.songs, key = { _, s -> s.id }) { i, s ->
                 SongRow(s, current = s.id == currentId, onClick = { vm.play(player, vm.songs, i) }) {
+                    DownloadButton(vm, s)
                     IconButton(onClick = { onAdd(s) }) { Icon(LunnaIcons.PlaylistAdd, "Agregar a playlist", tint = c.onSurfaceVariant) }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun DownloadButton(vm: AppViewModel, song: Song) {
+    val c = MaterialTheme.colorScheme
+    when {
+        song.id in vm.downloadingIds -> Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(Modifier.size(22.dp).semantics { contentDescription = "Descargando" }, strokeWidth = 2.dp)
+        }
+        song.id in vm.downloaded -> IconButton(onClick = { vm.removeDownload(song) }) {
+            Icon(LunnaIcons.DownloadDone, "Quitar descarga", tint = c.primary)
+        }
+        else -> IconButton(onClick = { vm.download(song) }) { Icon(LunnaIcons.Download, "Descargar", tint = c.onSurfaceVariant) }
     }
 }
 
