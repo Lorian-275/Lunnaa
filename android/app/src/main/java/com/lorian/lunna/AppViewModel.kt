@@ -1,6 +1,13 @@
 package com.lorian.lunna
 
+import android.content.Context
+import android.content.Intent
 import androidx.compose.runtime.getValue
+import androidx.core.content.FileProvider
+import io.github.jan.supabase.storage.storage
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.File
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
@@ -79,6 +86,39 @@ class AppViewModel : ViewModel() {
     fun loadAll() {
         search(query)
         viewModelScope.launch { refreshPlaylists() }
+        viewModelScope.launch { checkUpdate() }
+    }
+
+    var update by mutableStateOf<Release?>(null)
+    var downloading by mutableStateOf(false); private set
+
+    private suspend fun checkUpdate() {
+        // Sin internet o sin tabla no pasa nada: se revisa otra vez la próxima vez que se abra.
+        runCatching {
+            supabase.from("app_releases").select {
+                order("version_code", Order.DESCENDING)
+                limit(1)
+            }.decodeList<Release>().firstOrNull()
+        }.getOrNull()?.takeIf { it.versionCode > BuildConfig.VERSION_CODE }?.let { update = it }
+    }
+
+    fun installUpdate(context: Context, release: Release) {
+        viewModelScope.launch {
+            downloading = true
+            attempt("No se pudo descargar la actualización.") {
+                val bytes = supabase.storage.from("apk").downloadAuthenticated(release.apkPath)
+                val file = withContext(Dispatchers.IO) {
+                    File(context.cacheDir, "updates").apply { mkdirs() }.resolve("lunna.apk").apply { writeBytes(bytes) }
+                }
+                val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+                // Android pide permiso para "instalar apps de esta fuente" la primera vez.
+                context.startActivity(
+                    Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive")
+                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+            }
+            downloading = false
+        }
     }
 
     fun search(q: String) {

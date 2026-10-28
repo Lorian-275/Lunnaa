@@ -76,3 +76,19 @@ language sql security definer set search_path = public as $$
   );
 $$;
 revoke execute on function usage_stats() from public, anon, authenticated;
+
+-- Actualizaciones de la app: tools/release.py sube el APK al bucket 'apk' y registra la versión aquí.
+create table public.app_releases (
+  version_code int primary key,
+  version_name text not null,
+  apk_path text not null,
+  notes text,
+  created_at timestamptz not null default now()
+);
+alter table public.app_releases enable row level security;
+create policy "usuarios leen releases" on public.app_releases for select to authenticated using (true);
+
+-- Bucket privado; 50 MB es el máximo por archivo del plan gratis.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('apk', 'apk', false, 52428800, array['application/vnd.android.package-archive']);
+create policy "usuarios descargan apk" on storage.objects for select to authenticated using (bucket_id = 'apk');

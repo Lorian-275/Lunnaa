@@ -79,6 +79,7 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -113,6 +114,7 @@ fun App(status: SessionStatus, player: Player?, vm: AppViewModel = viewModel()) 
         is SessionStatus.Authenticated, is SessionStatus.RefreshFailure -> {
             LaunchedEffect(Unit) { vm.loadAll() }
             MainScreen(vm, player)
+            vm.update?.let { UpdateDialog(vm, it) }
         }
         is SessionStatus.NotAuthenticated -> LoginScreen(vm)
     }
@@ -547,6 +549,30 @@ private fun PlaylistDetail(vm: AppViewModel, open: Playlist, player: Player?, cu
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancelar") } },
         )
     }
+}
+
+@Composable
+fun UpdateDialog(vm: AppViewModel, release: Release) {
+    val context = LocalContext.current
+    AlertDialog(
+        onDismissRequest = { if (!vm.downloading) vm.update = null },
+        title = { Text("Nueva versión ${release.versionName}") },
+        text = {
+            Column {
+                Text(release.notes ?: "Hay una actualización de Lunna lista para instalar.")
+                if (vm.downloading) {
+                    Spacer(Modifier.height(16.dp))
+                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = !vm.downloading, onClick = { vm.installUpdate(context, release) }) {
+                Text(if (vm.downloading) "Descargando…" else "Actualizar")
+            }
+        },
+        dismissButton = { TextButton(enabled = !vm.downloading, onClick = { vm.update = null }) { Text("Más tarde") } },
+    )
 }
 
 @Composable

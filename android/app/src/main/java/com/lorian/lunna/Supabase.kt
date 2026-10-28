@@ -4,6 +4,7 @@ import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.functions.Functions
 import io.github.jan.supabase.postgrest.Postgrest
+import io.github.jan.supabase.storage.Storage
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -15,7 +16,16 @@ val supabase = createSupabaseClient(
     install(Auth)
     install(Postgrest)
     install(Functions)
+    install(Storage)
 }
+
+@Serializable
+data class Release(
+    @SerialName("version_code") val versionCode: Int,
+    @SerialName("version_name") val versionName: String,
+    @SerialName("apk_path") val apkPath: String,
+    val notes: String? = null,
+)
 
 @Serializable
 data class Song(
