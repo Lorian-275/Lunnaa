@@ -8,6 +8,11 @@ import os
 import sys
 from pathlib import Path
 
+import truststore
+
+# Usa los certificados de Windows: antivirus como Avast reemplazan el certificado HTTPS con uno propio.
+truststore.inject_into_ssl()
+
 import boto3
 import mutagen
 from dotenv import load_dotenv

@@ -2,3 +2,4 @@ boto3==1.35.36
 mutagen==1.47.0
 python-dotenv==1.0.1
 supabase==2.9.1
+truststore==0.10.4
