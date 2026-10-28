@@ -92,3 +92,7 @@ create policy "usuarios leen releases" on public.app_releases for select to auth
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('apk', 'apk', false, 52428800, array['application/vnd.android.package-archive']);
 create policy "usuarios descargan apk" on storage.objects for select to authenticated using (bucket_id = 'apk');
+
+-- La app busca actualizaciones antes de iniciar sesión; el APK no da acceso a datos sin cuenta.
+alter policy "usuarios leen releases" on public.app_releases to anon, authenticated;
+alter policy "usuarios descargan apk" on storage.objects to anon, authenticated;

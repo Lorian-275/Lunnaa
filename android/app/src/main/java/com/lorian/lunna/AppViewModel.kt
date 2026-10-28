@@ -86,14 +86,13 @@ class AppViewModel : ViewModel() {
     fun loadAll() {
         search(query)
         viewModelScope.launch { refreshPlaylists() }
-        viewModelScope.launch { checkUpdate() }
     }
 
     var update by mutableStateOf<Release?>(null)
     var downloading by mutableStateOf(false); private set
 
-    private suspend fun checkUpdate() {
-        // Sin internet o sin tabla no pasa nada: se revisa otra vez la próxima vez que se abra.
+    fun checkUpdate() = viewModelScope.launch {
+        // Sin internet no pasa nada: se revisa otra vez la próxima vez que se abra.
         runCatching {
             supabase.from("app_releases").select {
                 order("version_code", Order.DESCENDING)

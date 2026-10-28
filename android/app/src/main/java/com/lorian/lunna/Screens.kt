@@ -107,6 +107,9 @@ import java.util.Calendar
 
 @Composable
 fun App(status: SessionStatus, player: Player?, vm: AppViewModel = viewModel()) {
+    // Antes del login también: si la sesión se cerró, igual debe llegar la actualización.
+    LaunchedEffect(Unit) { vm.checkUpdate() }
+    vm.update?.let { UpdateDialog(vm, it) }
     when (status) {
         is SessionStatus.Initializing ->
             Box(Modifier.fillMaxSize().background(NightBrush), contentAlignment = Alignment.Center) { MoonLogo(72.dp) }
@@ -114,7 +117,6 @@ fun App(status: SessionStatus, player: Player?, vm: AppViewModel = viewModel()) 
         is SessionStatus.Authenticated, is SessionStatus.RefreshFailure -> {
             LaunchedEffect(Unit) { vm.loadAll() }
             MainScreen(vm, player)
-            vm.update?.let { UpdateDialog(vm, it) }
         }
         is SessionStatus.NotAuthenticated -> LoginScreen(vm)
     }
